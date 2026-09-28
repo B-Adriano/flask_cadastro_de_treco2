@@ -1,29 +1,53 @@
+'''
+app.py
+Aplicativo principal
+'''
+
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 import sqlite3
 import random
 
 app = Flask(__name__)
+
 app.secret_key = '_use_uma_secret_key_de_verdade_aqui_e_use_dotenv_em_deploy_'
+
 
 @app.route("/")
 def index():
 
+    page = request.args.get("p", 1, type=int)
+
+    per_page = 18
+    offset = (page - 1) * per_page
+
     with sqlite3.connect('database.db') as conn:
         conn.row_factory = sqlite3.Row
-        contents = conn.execute("""
-            SELECT id, name, photo 
-            FROM thing
-                WHERE status = 'on'
-                ORDER BY created_at DESC
-        """).fetchall()
 
-    total = len(contents)
+        contents = conn.execute("""
+            SELECT id, name, photo
+            FROM thing
+            WHERE status = 'on'
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        """, (per_page, offset)).fetchall()
+
+        total = conn.execute("""
+            SELECT COUNT(*)
+            FROM thing
+            WHERE status = 'on'
+        """).fetchone()[0]
+
+    pages = (total + per_page - 1) // per_page
 
     return render_template(
         'index.html',
         contents=contents,
-        total=total
+        total=total,
+        page=page,
+        pages=pages,
+        page_css='index.css'
     )
+
 
 @app.route('/view/<int:thing_id>')
 def view(thing_id):
@@ -46,12 +70,11 @@ def view(thing_id):
         content=content
     )
 
+
 @app.route("/new", methods=['GET', 'POST'])
 def new_thing():
 
-    sended = False
     photo_number = random.randint(10, 999)
-    thing_name = str()
 
     if request.method == 'POST':
         name = request.form['name'].strip()
@@ -60,21 +83,21 @@ def new_thing():
         photo = request.form['photo'].strip()
 
         with sqlite3.connect('database.db') as conn:
-            conn.execute("""
+            cursor = conn.execute("""
                 INSERT INTO thing (
                     name, description, location, photo
                 ) VALUES (?, ?, ?, ?)
-            """, (name, description, location, photo,))
+            """, (name, description, location, photo))
 
-            sended = True
-            thing_name = name
+            flash('Registro cadastrado com sucesso!', 'success')
+
+            return redirect(url_for('view', thing_id=cursor.lastrowid))
 
     return render_template(
         "new.html",
-        photo_number=photo_number,
-        thing_name=thing_name,
-        sended=sended
+        photo_number=photo_number
     )
+
 
 @app.route('/edit/<int:thing_id>', methods=['GET', 'POST'])
 def edit(thing_id):
@@ -119,6 +142,7 @@ def edit(thing_id):
         content=content
     )
 
+
 @app.route('/delete/<int:thing_id>')
 def delete(thing_id):
 
@@ -145,11 +169,12 @@ def delete(thing_id):
         flash('Registro apagado com sucesso!', 'success')
 
         return redirect(url_for('index', thing_id=thing_id))
-    
+
 
 @app.route("/about")
 def about():
     return render_template("about.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)

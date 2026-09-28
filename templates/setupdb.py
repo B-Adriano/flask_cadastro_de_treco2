@@ -1,6 +1,8 @@
-# setupdb.py
-# Faz o reset e o setup inicial do banco de dados SELite quando necessário.
-# PERIGO! Use isso somente em "devtime".
+'''
+setupdb.py
+Faz o reset e o setup inicial do banco de dados SELite quando necessário.
+PERIGO! Use isso somente em "devtime".
+'''
 
 import sqlite3
 
